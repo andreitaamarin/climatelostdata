@@ -8,6 +8,7 @@
 </head>
 <body>
     <div id="noise-overlay"></div>
+    
     <div class="container">
         <header>
             <p class="status">ESTADO: ENCONTRADO</p>
@@ -18,12 +19,24 @@
             <h1 class="title">DATOS DE TEMPERATURA</h1>
             <p class="subtitle">09:30:12 | 18/11/2025</p>
             
-            <div id="data-graph">
-                </div>
+            <p id="bogota-temp">BOGOTÁ: 18.2 °C [ERROR DATO]</p>
             
-            <a href="#" id="core-link" class="neon-link">[ ACCEDER AL ARCHIVO NÚCLEO ]</a>
+            <div id="data-graph">
+            </div>
+            
+            <a href="nucleo.html" id="core-link" class="neon-link">[ ACCEDER AL ARCHIVO NÚCLEO ]</a>
         </main>
     </div>
+
+    <div id="controls-guide">
+        <p>INTERACCIÓN:</p>
+        <p>MOUSE: REPELENTE DE DATOS</p>
+        <p>TECLA [ R ]: INTENTAR REINICIO</p>
+    </div>
+
+    <audio id="weather-audio" loop autoplay muted>
+        <source src="ambiente.mp3" type="audio/mp3">
+    </audio>
 
     <script src="script.js"></script>
 </body>

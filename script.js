@@ -3,15 +3,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const NUM_POINTS = 60;
     let points = [];
 
-    // --- A. Generación Inicial de Puntos ---
+    const audio = document.getElementById('weather-audio');
+
+    function playGlitchSound() {
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(context.destination);
+
+        oscillator.type = 'sawtooth'; 
+        oscillator.frequency.setValueAtTime(Math.random() * 500 + 500, context.currentTime); 
+        
+        gainNode.gain.setValueAtTime(0.5, context.currentTime); 
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.05); 
+
+        oscillator.start(context.currentTime);
+        oscillator.stop(context.currentTime + 0.05);
+    }
+
+    document.body.addEventListener('click', () => {
+        if (audio.muted) {
+            audio.muted = false;
+            audio.play().catch(e => console.log("Audio no pudo iniciar."));
+        }
+    }, { once: true }); 
+
     function createPoints() {
         for (let i = 0; i < NUM_POINTS; i++) {
             const point = document.createElement('div');
             point.classList.add('data-point');
-            // Alterna los colores Cian y Magenta
             point.classList.add(i % 2 === 0 ? 'point-cyan' : 'point-magenta');
             
-            // Posición inicial aleatoria dentro del contenedor del gráfico
             const x = Math.random() * (graph.clientWidth - 10);
             const y = Math.random() * (graph.clientHeight - 10);
             
@@ -29,26 +53,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- B. Función de Inestabilidad (Gráfico Vibrante) ---
     function induceInstability() {
+        playGlitchSound(); 
+
         points.forEach(p => {
-            const disturbance = (Math.random() - 0.5) * 6; // Desplazamiento aleatorio de -3 a 3 píxeles
+            const disturbance = (Math.random() - 0.5) * 6; 
             
-            // Aplica la vibración
             p.element.style.transform = `translate(${disturbance}px, ${disturbance}px)`;
 
-            // Reordena un pequeño subconjunto de puntos de vez en cuando (efecto Glitch)
             if (Math.random() < 0.1) {
-                const newX = Math.random() * (graph.clientWidth - 10);
-                const newY = Math.random() * (graph.clientHeight - 10);
-                p.element.style.left = `${newX}px`;
-                p.element.style.top = `${newY}px`;
-                p.x = newX;
-                p.y = newY;
+                p.originalX = Math.random() * (graph.clientWidth - 10);
+                p.originalY = Math.random() * (graph.clientHeight - 10);
             }
         });
 
-        // Restablece la vibración después de un breve momento
         setTimeout(() => {
             points.forEach(p => {
                 p.element.style.transform = 'translate(0, 0)';
@@ -56,45 +74,115 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     }
 
-    // Ejecuta la inestabilidad cada 3-5 segundos
     setInterval(induceInstability, 3500); 
 
-
-    // --- C. Cursor con Rastro de Píxeles ---
-    const cursorColor = '#00FFFF'; // Color Cian para el cursor
+    const cursorColor = '#00FFFF'; 
+    let mouseX = 0;
+    let mouseY = 0;
 
     document.addEventListener('mousemove', (e) => {
-        // Crear el rastro (el cuadrado que desaparece)
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+
         const trail = document.createElement('div');
         trail.style.position = 'absolute';
         trail.style.width = '12px';
         trail.style.height = '12px';
         trail.style.backgroundColor = cursorColor;
-        trail.style.left = `${e.clientX}px`;
-        trail.style.top = `${e.clientY}px`;
+        trail.style.left = `${mouseX}px`;
+        trail.style.top = `${mouseY}px`;
         trail.style.zIndex = 1000;
         document.body.appendChild(trail);
 
-        // Hace que el rastro desaparezca rápidamente
-        trail.style.opacity = 1;
-        const trailDuration = 200; // ms
-        
+        const trailDuration = 200; 
         setTimeout(() => {
             trail.style.transition = `opacity ${trailDuration}ms, transform ${trailDuration}ms`;
             trail.style.opacity = 0;
-            trail.style.transform = 'scale(0.5)'; // Encogerlo un poco al desaparecer
+            trail.style.transform = 'scale(0.5)';
             
-            // Eliminar del DOM después de la transición
             setTimeout(() => {
                 trail.remove();
             }, trailDuration);
-        }, 50); // Pequeño retraso para que se vea el rastro
-
-        // Crear el cursor principal (el cuadrado persistente)
-        // Usaremos el cursor CSS si lo tenemos, o un elemento persistente.
-        // Para simplicidad inicial, el "cursor" es el rastro constante.
+        }, 50); 
     });
 
-    // Inicia el proyecto
+
+    function updateGraph() {
+        const graphRect = graph.getBoundingClientRect(); 
+        const REPULSION_RADIUS = 80; 
+
+        points.forEach(p => {
+            const pointX_Screen = graphRect.left + p.x;
+            const pointY_Screen = graphRect.top + p.y;
+            
+            const dx = pointX_Screen - mouseX;
+            const dy = pointY_Screen - mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < REPULSION_RADIUS) {
+                const angle = Math.atan2(dy, dx);
+                const force = (REPULSION_RADIUS - distance) / REPULSION_RADIUS;
+                
+                const newX = p.x + Math.cos(angle) * force * 15; 
+                const newY = p.y + Math.sin(angle) * force * 15; 
+
+                p.x = Math.max(0, Math.min(graph.clientWidth - 10, newX));
+                p.y = Math.max(0, Math.min(graph.clientHeight - 10, newY));
+                
+                p.element.style.left = `${p.x}px`;
+                p.element.style.top = `${p.y}px`;
+
+            } else {
+                p.x += (p.originalX - p.x) * 0.05;
+                p.y += (p.originalY - p.y) * 0.05;
+
+                p.element.style.left = `${p.x}px`;
+                p.element.style.top = `${p.y}px`;
+            }
+        });
+
+        requestAnimationFrame(updateGraph);
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'R' || e.key === 'r') {
+            e.preventDefault();
+
+            const systemMessage = document.createElement('div');
+            systemMessage.textContent = "SISTEMA: CORRIGIENDO... [FALLO]";
+            systemMessage.style.position = 'fixed';
+            systemMessage.style.top = '50%';
+            systemMessage.style.left = '50%';
+            systemMessage.style.transform = 'translate(-50%, -50%)';
+            systemMessage.style.fontSize = '3em';
+            systemMessage.style.color = 'var(--color-magenta)';
+            systemMessage.style.zIndex = '2000';
+            document.body.appendChild(systemMessage);
+
+            points.forEach((p, index) => {
+                const gridCols = 12;
+                const gridRow = Math.floor(index / gridCols);
+                const gridCol = index % gridCols;
+
+                const gridX = (graph.clientWidth / gridCols) * gridCol + 15;
+                const gridY = (graph.clientHeight / 5) * gridRow + 15;
+
+                p.element.style.left = `${gridX}px`;
+                p.element.style.top = `${gridY}px`;
+                p.element.style.transition = 'left 0.1s, top 0.1s'; 
+            });
+
+            setTimeout(() => {
+                systemMessage.remove();
+
+                points.forEach(p => {
+                    p.element.style.transition = 'none'; 
+                });
+            }, 500); 
+        }
+    });
+
+
     createPoints();
+    requestAnimationFrame(updateGraph);
 });
